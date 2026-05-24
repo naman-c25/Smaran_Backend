@@ -11,6 +11,9 @@ const EMBEDDING_MODEL = 'gemini-embedding-2';
  * Returns: { people, topics, mood, location, summary }
  */
 async function extractTags(text) {
+  console.log('🟡 [TAGS] Starting tag extraction...');
+  console.log('🟡 [TAGS] Input text preview:', text.slice(0, 100));
+
   const prompt = `You are a memory tagging system for a personal memory app.
 Extract structured information from this memory.
 Respond in JSON only. No explanation. No markdown. No code blocks.
@@ -42,18 +45,29 @@ Return exactly this structure:
     });
 
     const raw = response.text;
+    console.log('🟡 [TAGS] Raw Gemini response:', raw);
+
     const cleaned = raw.replace(/```json|```/g, '').trim();
     const tags = JSON.parse(cleaned);
 
-    return {
+    const result = {
       people: Array.isArray(tags.people) ? tags.people : [],
       topics: Array.isArray(tags.topics) ? tags.topics : [],
       mood: tags.mood || 'neutral',
       location: Array.isArray(tags.location) ? tags.location : [],
       summary: tags.summary || ''
     };
+
+    console.log('✅ [TAGS] Extracted successfully:');
+    console.log('   people   :', result.people);
+    console.log('   topics   :', result.topics);
+    console.log('   mood     :', result.mood);
+    console.log('   location :', result.location);
+    console.log('   summary  :', result.summary);
+
+    return result;
   } catch (err) {
-    console.error('Tag extraction error:', err.message);
+    console.error('❌ [TAGS] Extraction failed:', err.message);
     return { people: [], topics: [], mood: 'neutral', location: [], summary: '' };
   }
 }
@@ -64,15 +78,35 @@ Return exactly this structure:
  * Returns: array of 3072 numbers
  */
 async function generateEmbedding(text) {
+  console.log('🔵 [EMBEDDING] Starting embedding generation...');
+  console.log('🔵 [EMBEDDING] Text length:', text.length, 'characters');
+  console.log('🔵 [EMBEDDING] Text preview:', text.slice(0, 100));
+
   try {
     const response = await ai.models.embedContent({
       model: EMBEDDING_MODEL,
       contents: text
     });
 
-    return response.embeddings[0].values;
+    const vector = response.embeddings[0].values;
+
+    console.log('✅ [EMBEDDING] Generated successfully!');
+    console.log('✅ [EMBEDDING] Dimensions:', vector.length);
+    console.log('✅ [EMBEDDING] First 5 values:', vector.slice(0, 5).map(v => v.toFixed(6)));
+    console.log('✅ [EMBEDDING] Last 5 values:', vector.slice(-5).map(v => v.toFixed(6)));
+    console.log('✅ [EMBEDDING] Min value:', Math.min(...vector).toFixed(6));
+    console.log('✅ [EMBEDDING] Max value:', Math.max(...vector).toFixed(6));
+
+    if (vector.length !== 3072) {
+      console.warn('⚠️ [EMBEDDING] WARNING: Expected 3072 dimensions, got', vector.length);
+    } else {
+      console.log('✅ [EMBEDDING] Dimension check passed: 3072 ✓');
+    }
+
+    return vector;
   } catch (err) {
-    console.error('Embedding error:', err.message);
+    console.error('❌ [EMBEDDING] Generation failed:', err.message);
+    console.error('❌ [EMBEDDING] Full error:', err);
     throw err;
   }
 }
@@ -83,6 +117,11 @@ async function generateEmbedding(text) {
  * Returns: { answer, mood }
  */
 async function generateAnswer(query, memories, connections = []) {
+  console.log('🟣 [ANSWER] Generating answer...');
+  console.log('🟣 [ANSWER] Query:', query);
+  console.log('🟣 [ANSWER] Memories passed:', memories.length);
+  console.log('🟣 [ANSWER] Connections passed:', connections.length);
+
   const memoriesText = memories
     .map(m => `[${m.date_label || m.recorded_at}] ${m.raw_text}\n(mood: ${m.mood}, people: ${(m.people || []).join(', ')})`)
     .join('\n\n');
@@ -124,15 +163,21 @@ Return JSON only, no markdown, no code blocks:
     });
 
     const raw = response.text;
+    console.log('🟣 [ANSWER] Raw Gemini response:', raw);
+
     const cleaned = raw.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(cleaned);
+
+    console.log('✅ [ANSWER] Generated successfully!');
+    console.log('✅ [ANSWER] Answer:', parsed.answer);
+    console.log('✅ [ANSWER] Mood:', parsed.mood);
 
     return {
       answer: parsed.answer || 'Mujhe is baare mein koi memory nahi mili.',
       mood: parsed.mood || 'neutral'
     };
   } catch (err) {
-    console.error('Answer generation error:', err.message);
+    console.error('❌ [ANSWER] Generation failed:', err.message);
     return {
       answer: 'Kuch gadbad ho gayi, dobara try karo.',
       mood: 'neutral'
@@ -146,7 +191,14 @@ Return JSON only, no markdown, no code blocks:
  * Returns: array of connection objects
  */
 async function detectConnections(newMemory, recentMemories) {
-  if (!recentMemories || recentMemories.length === 0) return [];
+  console.log('🟠 [CONNECTIONS] Starting connection detection...');
+  console.log('🟠 [CONNECTIONS] New memory:', newMemory.summary || newMemory.raw_text?.slice(0, 80));
+  console.log('🟠 [CONNECTIONS] Recent memories to compare:', recentMemories?.length || 0);
+
+  if (!recentMemories || recentMemories.length === 0) {
+    console.log('🟠 [CONNECTIONS] No recent memories, skipping.');
+    return [];
+  }
 
   const prompt = `You are analyzing personal memories for patterns.
 
@@ -182,11 +234,22 @@ If no meaningful connections return { "connections": [] }`;
     });
 
     const raw = response.text;
+    console.log('🟠 [CONNECTIONS] Raw Gemini response:', raw);
+
     const cleaned = raw.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(cleaned);
-    return parsed.connections || [];
+    const connections = parsed.connections || [];
+
+    console.log('✅ [CONNECTIONS] Detected:', connections.length, 'connection(s)');
+    connections.forEach((c, i) => {
+      console.log(`   [${i + 1}] type: ${c.connection_type}`);
+      console.log(`        pattern: ${c.pattern}`);
+      console.log(`        insight: ${c.insight}`);
+    });
+
+    return connections;
   } catch (err) {
-    console.error('Connection detection error:', err.message);
+    console.error('❌ [CONNECTIONS] Detection failed:', err.message);
     return [];
   }
 }
