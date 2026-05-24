@@ -93,9 +93,6 @@ async function generateEmbedding(text) {
     console.log('✅ [EMBEDDING] Generated successfully!');
     console.log('✅ [EMBEDDING] Dimensions:', vector.length);
     console.log('✅ [EMBEDDING] First 5 values:', vector.slice(0, 5).map(v => v.toFixed(6)));
-    console.log('✅ [EMBEDDING] Last 5 values:', vector.slice(-5).map(v => v.toFixed(6)));
-    console.log('✅ [EMBEDDING] Min value:', Math.min(...vector).toFixed(6));
-    console.log('✅ [EMBEDDING] Max value:', Math.max(...vector).toFixed(6));
 
     if (vector.length !== 3072) {
       console.warn('⚠️ [EMBEDDING] WARNING: Expected 3072 dimensions, got', vector.length);
@@ -114,7 +111,7 @@ async function generateEmbedding(text) {
 /**
  * Generate final answer from memories
  * Model: gemini-2.5-flash
- * Returns: { answer, mood }
+ * Returns: { answer, mood, voiceDescription, speaker, pitchShift }
  */
 async function generateAnswer(query, memories, connections = []) {
   console.log('🟣 [ANSWER] Generating answer...');
@@ -152,10 +149,40 @@ Relevant memories:
 ${memoriesText}
 ${connectionsText}
 
+Also generate voice narration metadata for Silk TTS Mulberry model.
+The voice should feel like a close personal friend reading this answer to the user.
+
+Speaker selection rules:
+- sad / stressed / anxious → speaker_1
+- happy / excited / proud  → speaker_2
+- neutral / calm           → speaker_3
+- angry / frustrated       → speaker_4
+
+Pitch shift rules:
+- Very sad content   → -2
+- Slightly sad       → -1
+- Normal             → 0
+- Slightly excited   → +1
+- Very excited       → +2
+
+Voice description rules:
+- Max 8 words
+- Warm, personal, friend-like tone
+- Match the emotional weight of the answer
+- Examples:
+  "warm close friend, gentle and concerned"
+  "excited best friend sharing good news"
+  "calm supportive friend, slightly serious"
+  "soft and reflective, like late night talk"
+  "cheerful and warm, light energy"
+
 Return JSON only, no markdown, no code blocks:
 {
   "answer": "your full answer here",
-  "mood": "one of: happy | sad | excited | stressed | neutral"
+  "mood": "one of: happy | sad | excited | stressed | neutral",
+  "voiceDescription": "max 8 words describing narrator tone",
+  "speaker": "speaker_1 or speaker_2 or speaker_3 or speaker_4",
+  "pitchShift": integer between -2 and 2
 }`;
 
   try {
@@ -173,16 +200,25 @@ Return JSON only, no markdown, no code blocks:
     console.log('✅ [ANSWER] Generated successfully!');
     console.log('✅ [ANSWER] Answer:', parsed.answer);
     console.log('✅ [ANSWER] Mood:', parsed.mood);
+    console.log('✅ [ANSWER] Voice description:', parsed.voiceDescription);
+    console.log('✅ [ANSWER] Speaker:', parsed.speaker);
+    console.log('✅ [ANSWER] Pitch shift:', parsed.pitchShift);
 
     return {
       answer: parsed.answer || 'Mujhe is baare mein koi memory nahi mili.',
-      mood: parsed.mood || 'neutral'
+      mood: parsed.mood || 'neutral',
+      voiceDescription: parsed.voiceDescription || 'warm close friend, calm and gentle',
+      speaker: parsed.speaker || 'speaker_3',
+      pitchShift: typeof parsed.pitchShift === 'number' ? parsed.pitchShift : 0
     };
   } catch (err) {
     console.error('❌ [ANSWER] Generation failed:', err.message);
     return {
       answer: 'Kuch gadbad ho gayi, dobara try karo.',
-      mood: 'neutral'
+      mood: 'neutral',
+      voiceDescription: 'calm and neutral narrator',
+      speaker: 'speaker_3',
+      pitchShift: 0
     };
   }
 }

@@ -18,13 +18,6 @@ function formatDate(dateStr) {
 /**
  * POST /api/memory
  * Save a new memory
- *
- * Request body:
- * {
- *   "text": "Aaj Rahul se baat ki...",
- *   "recordedAt": "2026-05-24T09:41:00Z",   (optional)
- *   "durationSeconds": 45                    (optional)
- * }
  */
 router.post('/', authenticateToken, async (req, res) => {
   const { text, recordedAt, durationSeconds } = req.body;
@@ -88,7 +81,6 @@ router.post('/', authenticateToken, async (req, res) => {
  * Background job — detect connections after saving memory
  */
 async function detectConnectionsBackground(newMemoryId, userId, newMemory) {
-  // Get last 30 memories for this user
   const recent = await pool.query(`
     SELECT id, raw_text, summary, people, mood, date_label
     FROM memories
@@ -103,7 +95,6 @@ async function detectConnectionsBackground(newMemoryId, userId, newMemory) {
 
   if (connections.length === 0) return;
 
-  // Find matching memory ids by summary match
   for (const conn of connections) {
     const matched = recent.rows.find(m =>
       m.summary && conn.connected_memory_summary &&
@@ -128,13 +119,8 @@ async function detectConnectionsBackground(newMemoryId, userId, newMemory) {
 }
 
 /**
- * POST /api/ask
+ * POST /api/memory/ask
  * Query memories and get AI-generated answer
- *
- * Request body:
- * {
- *   "query": "Why was I stressed this week?"
- * }
  */
 router.post('/ask', authenticateToken, async (req, res) => {
   const { query } = req.body;
@@ -162,7 +148,10 @@ router.post('/ask', authenticateToken, async (req, res) => {
     if (vectorResult.rows.length === 0) {
       return res.json({
         answer: 'Mujhe is baare mein koi memory nahi mili.',
-        mood: 'neutral'
+        mood: 'neutral',
+        voiceDescription: 'calm and gentle, soft tone',
+        speaker: 'speaker_3',
+        pitchShift: 0
       });
     }
 
@@ -172,15 +161,12 @@ router.post('/ask', authenticateToken, async (req, res) => {
     const reranked = vectorResult.rows.map(memory => {
       let score = parseFloat(memory.similarity) || 0;
 
-      // Boost if people match
       const peopleMatch = (memory.people || [])
         .filter(p => queryTags.people.includes(p)).length;
 
-      // Boost if topics match
       const topicMatch = (memory.topics || [])
         .filter(t => queryTags.topics.includes(t)).length;
 
-      // Boost if mood matches
       const moodMatch = memory.mood === queryTags.mood ? 0.1 : 0;
 
       score += peopleMatch * 0.2;
@@ -205,10 +191,16 @@ router.post('/ask', authenticateToken, async (req, res) => {
       connections = connResult.rows;
     }
 
-    // Step 5: Generate answer via Gemini
-    const { answer, mood } = await generateAnswer(query, reranked, connections);
+    // Step 5: Generate answer via Gemini (now returns voiceDescription, speaker, pitchShift too)
+    const { answer, mood, voiceDescription, speaker, pitchShift } = await generateAnswer(query, reranked, connections);
 
-    res.json({ answer, mood });
+    res.json({
+      answer,
+      mood,
+      voiceDescription,
+      speaker,
+      pitchShift
+    });
 
   } catch (err) {
     console.error('Error processing query:', err);
