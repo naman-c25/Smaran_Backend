@@ -4,7 +4,6 @@ require('dotenv').config();
 
 const app = express();
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
@@ -12,45 +11,34 @@ app.use(express.json());
 const authRoutes = require('./routes/auth');
 const memoryRoutes = require('./routes/memory');
 
-// Mount routes under /api
 app.use('/api/auth', authRoutes);
 app.use('/api/memory', memoryRoutes);
 
-// Health check endpoint
+// Health check
 app.get('/', (req, res) => {
-  res.json({ 
-    status: 'Smaran backend running', 
-    timestamp: new Date().toISOString(),
-    version: '2.0.0 (with auth)'
+  res.json({
+    status: 'Smaran backend running',
+    version: '3.0.0',
+    timestamp: new Date().toISOString()
   });
 });
 
-// Error handling middleware
+// Error handler
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
-  res.status(500).json({ 
-    error: 'Internal server error',
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✓ Smaran backend running on port ${PORT}`);
-  console.log(`✓ Version: 2.0.0 (with Authentication & Role Separation)`);
-  console.log(`✓ API endpoints:`);
-  console.log(`\n  Authentication:`);
-  console.log(`  POST   /api/auth/signup        - Register new user`);
-  console.log(`  POST   /api/auth/login         - Login user`);
-  console.log(`  POST   /api/auth/logout        - Logout user`);
-  console.log(`  GET    /api/auth/profile       - Get user profile`);
-  console.log(`  PUT    /api/auth/profile       - Update profile`);
-  console.log(`  PUT    /api/auth/password      - Change password`);
-  console.log(`\n  Memories (require auth):`);
-  console.log(`  POST   /api/memory             - Save a new memory`);
-  console.log(`  POST   /api/memory/ask         - Query memories and get answer`);
-  console.log(`  GET    /api/memory/all         - Get all memories`);
-  console.log(`  GET    /api/memory/:id         - Get specific memory`);
-  console.log(`  PUT    /api/memory/:id         - Update memory`);
-  console.log(`  DELETE /api/memory/:id         - Delete memory`);
+  console.log(`\n  Auth endpoints:`);
+  console.log(`  POST  /api/auth/signup`);
+  console.log(`  POST  /api/auth/login`);
+  console.log(`  GET   /api/auth/profile`);
+  console.log(`\n  Memory endpoints:`);
+  console.log(`  POST  /api/memory        — save memory`);
+  console.log(`  POST  /api/memory/ask    — query memories`);
+  console.log(`  GET   /api/memory/all    — list all memories`);
+  console.log(`  DELETE /api/memory/:id  — delete memory`);
 });
