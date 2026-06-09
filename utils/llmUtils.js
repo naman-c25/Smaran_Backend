@@ -3,7 +3,7 @@ const { GoogleGenAI } = require('@google/genai');
 const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
 
 const GENERATE_MODEL = 'gemini-2.5-flash';
-const EMBEDDING_MODEL = 'gemini-embedding-2';
+const EMBEDDING_MODEL = 'gemini-embedding-001';
 
 /**
  * Extract tags from memory text
